@@ -178,3 +178,9 @@ select:
   - platform: atlantic_v5
     control_mode:
       name: Operation mode
+
+switch:
+  - platform: atlantic_v5
+    # Forces 0x0165FEF701 commands off at boot; turn on to force payload 0x64.
+    heating_element:
+      name: Heating element command

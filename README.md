@@ -76,8 +76,9 @@ atlantic_v5:
 ```
 
 `tx_pin` is rejected in this mode and `tx_enable_pin` is unused — the component
-never drives the bus in `listener`. The `control_mode` and `compressor_mode`
-selects are rejected at compile time too (see "Control (MITM only)" below);
+never drives the bus in `listener`. The `control_mode`, `compressor_mode` and
+`heating_element` selects are rejected at compile time too (see "Control
+(MITM only)" below);
 there's nothing to rewrite without a second UART sitting in the middle.
 
 ### `mitm` — relay + optional rewrite
@@ -364,6 +365,8 @@ select:
       name: Operation mode
     compressor_mode:
       name: Compressor mode
+    heating_element:
+      name: Heating element command mode
 ```
 
 `control_mode` rewrites the input-status frame (header `0164FF1403`), which
@@ -399,47 +402,45 @@ the HMI is told those two inputs are doing:
 ### Experimental compressor command override
 
 The `compressor_mode` select tests the candidate HMI command `0x0165FEF901`:
-`auto` passes it through unchanged, `off` rewrites its one-byte payload to
-`00`, and `on` rewrites it to `64`:
+`passthrough` passes it through unchanged, `off` rewrites its one-byte payload
+to `00`, and `on` rewrites it to `64`:
 
 | Option | Relay behavior |
 |---|---|
-| `auto` | Leave the HMI command unchanged |
+| `passthrough` | Leave the HMI command unchanged |
 | `off` | Force matching commands to `00` |
 | `on` | Force matching commands to `64` |
 
 ```yaml
 select:
   - platform: atlantic_v5
-    compressor_mode:
-      name: Compressor mode
+    compressor_mode: {name: Compressor mode}
 ```
 
 **Experimental: the compressor effect is not confirmed.** Captures show this
 HMI-origin value correlating with compressor operation, but do not establish
 that it is a command or that changing it will start or stop the compressor.
 This only rewrites matching CRC-valid, one-byte HMI frames in `mode: mitm`;
-it does not generate commands, and `auto` is the default at boot. Verify the
-result using independent power measurements and treat cycle/status entities as
-separate observations, not proof that this override succeeded.
+it does not generate commands, and `passthrough` is the default at boot. Verify
+the result using independent power measurements and treat cycle/status entities
+as separate observations, not proof that this override succeeded.
 
 ### Heating-element command override
 
-The `heating_element` switch forces the one-byte payload of HMI-origin
-`0x0165FEF701` commands to `00` when off or `64` (100%) when on:
+The `heating_element` select controls the one-byte payload of HMI-origin
+`0x0165FEF701` commands:
 
 ```yaml
-switch:
+select:
   - platform: atlantic_v5
-    heating_element:
-      name: Heating element command
+    heating_element: {name: Heating element command mode}
 ```
 
 This only affects matching, CRC-valid commands as they pass from HMI to MAIN
 in `mode: mitm`; it does not generate a command or change the read-only
-`heating_element_active` sensor's observed value. The switch starts off after
-boot, so matching commands are forced to `00` until it is turned on. Omit the
-block to leave the frame untouched. The mapping and effect remain assumptions
+`heating_element_active` sensor's observed value. `passthrough` leaves the
+HMI command unchanged, `off` forces `00`, and `on` forces `64` (100%).
+Passthrough is the default at boot. The mapping and effect remain assumptions
 based on observed traffic; use with care.
 
 ## Link blackout (MITM only): `switch: link_blackout`
@@ -537,6 +538,23 @@ publishes nothing, so `force_update` has no effect on `setpoint_min` /
   burst is expected on recovery — not something that has been tried here. In
   `listener` there is no such feedback at all, and the values stay as they
   were until the appliance next initialises.
+
+## Raw frame telemetry
+
+The optional text sensors `frame_<header>` expose the payload bytes for every
+known header, including the unmapped headers, without changing or replacing the
+decoded entities above. `unknown_frame` is a catch-all whose state includes
+the unrecognized header and payload. Only CRC-valid, payload-bearing frames are
+published; payload-less READ requests and WRITE acknowledgements carry no data
+and are skipped. In `mitm` mode, these states use the observed payload before
+any configured rewrite, matching the existing entity semantics.
+
+States contain uppercase hexadecimal bytes. One-, two- and four-byte payloads
+also show their unsigned big-endian value in brackets, for example
+`04B0 [BE=1200]`; this is a raw interpretation, not a claim about the field's
+meaning. Raw telemetry is marked diagnostic and only publishes when its state
+changes. Both example YAML files configure every per-header sensor and the
+unknown catch-all.
 
 ## Diagnostics
 

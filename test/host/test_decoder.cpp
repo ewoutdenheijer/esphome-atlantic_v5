@@ -567,5 +567,52 @@ int main() {
     CHECK(decoder.stats().unmapped_frames == 0);
   }
 
+  // Raw telemetry is independent of semantic decoding: every catalogued
+  // header maps to a stable text entity, and unknown frames retain their key.
+  {
+    for (size_t i = 0; i < atlantic_v5::header::MAPPED_COUNT; i++)
+      CHECK(atlantic_v5::frame_entity_id(atlantic_v5::header::MAPPED[i]) ==
+            atlantic_v5::ENT_FRAME_MAPPED_FIRST + i);
+    for (size_t i = 0; i < atlantic_v5::header::UNMAPPED_COUNT; i++)
+      CHECK(atlantic_v5::frame_entity_id(atlantic_v5::header::UNMAPPED[i]) ==
+            atlantic_v5::ENT_FRAME_UNMAPPED_FIRST + i);
+    CHECK(atlantic_v5::frame_entity_id(0x0164DEAD01ULL) == atlantic_v5::ENT_UNKNOWN_FRAME);
+
+    atlantic_v5::Decoder decoder;
+    Collector c;
+    const uint8_t mapped_payload[] = {0x13, 0x88};
+    auto mapped = make_frame(atlantic_v5::header::SETPOINT_MIN, mapped_payload, sizeof(mapped_payload));
+    decoder.decode_raw_frame(mapped, collect, &c);
+    CHECK(c.values.size() == 1);
+    CHECK(c.values[0].kind == atlantic_v5::DecodedValue::Kind::RAW_FRAME);
+    CHECK(c.values[0].id == atlantic_v5::ENT_FRAME_016414B701);
+    CHECK(std::strcmp(c.values[0].raw_frame, "1388 [BE=5000]") == 0);
+
+    const uint8_t unmapped_payload[] = {0x04, 0xB0};
+    auto unmapped = make_frame(0x0164FFDC01ULL, unmapped_payload, sizeof(unmapped_payload));
+    decoder.decode_raw_frame(unmapped, collect, &c);
+    CHECK(c.values.size() == 2);
+    CHECK(c.values[1].id == atlantic_v5::ENT_FRAME_0164FFDC01);
+    CHECK(std::strcmp(c.values[1].raw_frame, "04B0 [BE=1200]") == 0);
+
+    const uint8_t unknown_payload[] = {0xBE, 0xEF};
+    auto unknown = make_frame(0x0164DEAD01ULL, unknown_payload, sizeof(unknown_payload));
+    decoder.decode_raw_frame(unknown, collect, &c);
+    CHECK(c.values.size() == 3);
+    CHECK(c.values[2].id == atlantic_v5::ENT_UNKNOWN_FRAME);
+    CHECK(std::strcmp(c.values[2].raw_frame, "0164DEAD01:BEEF [BE=48879]") == 0);
+
+    auto request = make_frame(atlantic_v5::header::SETPOINT_MIN, nullptr, 0);
+    decoder.decode_raw_frame(request, collect, &c);
+    CHECK(c.values.size() == 3);
+
+    uint8_t max_payload[atlantic_v5::MAX_PAYLOAD];
+    std::memset(max_payload, 0xAB, sizeof(max_payload));
+    auto max_unknown = make_frame(0x0164DEAD01ULL, max_payload, sizeof(max_payload));
+    decoder.decode_raw_frame(max_unknown, collect, &c);
+    CHECK(c.values.size() == 4);
+    CHECK(std::strlen(c.values[3].raw_frame) == 59);
+  }
+
   TEST_MAIN_RETURN();
 }

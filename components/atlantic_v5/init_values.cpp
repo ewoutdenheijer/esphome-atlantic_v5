@@ -13,6 +13,8 @@ bool valid_kind(uint8_t raw) {
     case DecodedValue::Kind::TEXT:
     case DecodedValue::Kind::UINT:
       return true;
+    case DecodedValue::Kind::RAW_FRAME:
+      return false;
   }
   return false;
 }
@@ -31,6 +33,8 @@ bool same_value(const DecodedValue &a, const DecodedValue &b) {
       return a.u == b.u;
     case DecodedValue::Kind::TEXT:
       return std::strncmp(a.text, b.text, sizeof(a.text)) == 0;
+    case DecodedValue::Kind::RAW_FRAME:
+      return std::strncmp(a.raw_frame, b.raw_frame, sizeof(a.raw_frame)) == 0;
   }
   return false;
 }
@@ -77,6 +81,8 @@ uint8_t value_len(const DecodedValue &v) {
         n++;
       return n;
     }
+    case DecodedValue::Kind::RAW_FRAME:
+      return 0;
   }
   return 0;
 }
@@ -124,6 +130,8 @@ uint16_t InitValueStore::encode(uint8_t *out, uint16_t cap) const {
       case DecodedValue::Kind::TEXT:
         std::memcpy(out + n, v.text, len);
         break;
+      case DecodedValue::Kind::RAW_FRAME:
+        return 0;
     }
     n = static_cast<uint16_t>(n + len);
     count++;
@@ -202,6 +210,8 @@ bool InitValueStore::decode_records(const uint8_t *data, uint16_t len) {
         std::memcpy(v.text, data + n, value_bytes);
         v.text[value_bytes] = '\0';
         break;
+      case DecodedValue::Kind::RAW_FRAME:
+        return false;
     }
     n = static_cast<uint16_t>(n + value_bytes);
     this->values_[slot] = v;

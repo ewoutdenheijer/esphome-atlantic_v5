@@ -71,7 +71,9 @@ class AtlanticV5Component : public Component {
   // Controllable entity write paths: the relay is the only reader of policy_.
   void set_control_mode(::atlantic_v5::ControlMode mode);
   void set_compressor_mode(::atlantic_v5::CompressorMode mode) { this->policy_.set_compressor_mode(mode); }
-  void set_heating_element_active(bool active) { this->policy_.set_heating_element_active(active); }
+  void set_heating_element_mode(::atlantic_v5::HeatingElementMode mode) {
+    this->policy_.set_heating_element_mode(mode);
+  }
 
 #ifdef ATLANTIC_V5_LINK_BLACKOUT
   // The link_blackout switch's write path. Compiled in only when switch.py put
@@ -195,6 +197,8 @@ class AtlanticV5Component : public Component {
   // already dedupe internally in ESPHome core; sensor::Sensor does not.
   float last_published_[::atlantic_v5::ENT_COUNT];
   bool has_last_published_[::atlantic_v5::ENT_COUNT]{};
+  char last_frame_states_[::atlantic_v5::FRAME_ENTITY_COUNT][sizeof(::atlantic_v5::DecodedValue::raw_frame)]{};
+  bool has_last_frame_state_[::atlantic_v5::FRAME_ENTITY_COUNT]{};
   bool stale_{false};
 };
 

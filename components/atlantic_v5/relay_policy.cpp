@@ -15,7 +15,7 @@ bool RelayPolicy::apply(Frame &f) const {
       case CompressorMode::ON:
         value = 0x64;
         break;
-      case CompressorMode::AUTO:
+      case CompressorMode::PASSTHROUGH:
       default:
         return false;
     }
@@ -27,9 +27,18 @@ bool RelayPolicy::apply(Frame &f) const {
     if (f.channel() != Channel::HMI || f.payload_len() != HEATING_ELEMENT_PAYLOAD_LEN ||
         f.buffered_payload_len() < HEATING_ELEMENT_PAYLOAD_LEN || !f.crc_valid())
       return false;
-    uint8_t value = heating_element_value_.load(std::memory_order_relaxed);
-    if (value == 0xFF)
-      return false;
+    uint8_t value;
+    switch (static_cast<HeatingElementMode>(heating_element_mode_.load(std::memory_order_relaxed))) {
+      case HeatingElementMode::OFF:
+        value = 0x00;
+        break;
+      case HeatingElementMode::ON:
+        value = 0x64;
+        break;
+      case HeatingElementMode::PASSTHROUGH:
+      default:
+        return false;
+    }
     f.replace_payload(&value);
     return true;
   }

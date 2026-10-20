@@ -9,10 +9,9 @@
 
 namespace atlantic_v5 {
 
-// Index into L3's entity table. Order mirrors the message catalogue in
-// docs/protocol.md, payload-bearing frames with known meaning only, plus a block of
-// diagnostic counters appended at the end - not part of the wire
-// catalogue, but published through the same entity-id/publish plumbing.
+// Index into L3's entity table. Decoded entity order mirrors the message
+// catalogue in docs/protocol.md, followed by diagnostics and raw per-header
+// frame entities, all published through the same entity-id plumbing.
 enum EntityId : uint16_t {
   ENT_CONTROLLER_FIRMWARE_VERSION = 0,
   ENT_APPLIANCE_SERIAL,
@@ -83,6 +82,56 @@ enum EntityId : uint16_t {
   ENT_TASK_STACK_FREE,
   // Not wire traffic either: the staleness gate's own state.
   ENT_CONNECTED,
+  ENT_FRAME_0164006401,
+  ENT_FRAME_0164006501,
+  ENT_FRAME_0164006601,
+  ENT_FRAME_0164006701,
+  ENT_FRAME_0164006E01,
+  ENT_FRAME_016414B701,
+  ENT_FRAME_0164158301,
+  ENT_FRAME_0164FEB006,
+  ENT_FRAME_0164FEBA03,
+  ENT_FRAME_0164FEBD03,
+  ENT_FRAME_0164FEC003,
+  ENT_FRAME_0164FEC303,
+  ENT_FRAME_0164FEC603,
+  ENT_FRAME_0164FEC903,
+  ENT_FRAME_0164FEE203,
+  ENT_FRAME_0164FEE503,
+  ENT_FRAME_0164FEE803,
+  ENT_FRAME_0164FEEB03,
+  ENT_FRAME_0164FEEE03,
+  ENT_FRAME_0164FEF103,
+  ENT_FRAME_0164FF1403,
+  ENT_FRAME_0165000301,
+  ENT_FRAME_0165000A01,
+  ENT_FRAME_0165FEF701,
+  ENT_FRAME_0164007001,
+  ENT_FRAME_0164007101,
+  ENT_FRAME_0164007501,
+  ENT_FRAME_01640165FE,
+  ENT_FRAME_0164152A01,
+  ENT_FRAME_016421B601,
+  ENT_FRAME_016443130D,
+  ENT_FRAME_0164FDED01,
+  ENT_FRAME_0164FDEE01,
+  ENT_FRAME_0164FDFA01,
+  ENT_FRAME_0164FDFD01,
+  ENT_FRAME_0164FE0001,
+  ENT_FRAME_0164FED801,
+  ENT_FRAME_0164FFDC01,
+  ENT_FRAME_0165152301,
+  ENT_FRAME_016516B301,
+  ENT_FRAME_0165FDF802,
+  ENT_FRAME_0165FDFB02,
+  ENT_FRAME_0165FDFE02,
+  ENT_FRAME_0165FEF901,
+  ENT_FRAME_0165FEFB01,
+  ENT_FRAME_0165FEFD01,
+  ENT_FRAME_0165FEFF01,
+  ENT_FRAME_0165FF0101,
+  ENT_FRAME_0165FF0301,
+  ENT_UNKNOWN_FRAME,
   ENT_COUNT
 };
 
@@ -250,5 +299,14 @@ HeaderClass classify_header(uint64_t key);
 // established meaning. A frame whose key is in neither table is an *unknown*
 // frame, the only kind that warrants operator attention (CONTEXT.md).
 bool is_unmapped_header(uint64_t key);
+
+// Maps each catalogued header to its raw-frame entity; headers outside both
+// catalogue tables share the unknown-frame catch-all.
+EntityId frame_entity_id(uint64_t key);
+
+constexpr uint16_t ENT_FRAME_MAPPED_FIRST = ENT_FRAME_0164006401;
+constexpr uint16_t ENT_FRAME_UNMAPPED_FIRST = ENT_FRAME_0164007001;
+constexpr uint16_t ENT_FRAME_FIRST = ENT_FRAME_MAPPED_FIRST;
+constexpr size_t FRAME_ENTITY_COUNT = ENT_COUNT - ENT_FRAME_FIRST;
 
 }  // namespace atlantic_v5

@@ -1,5 +1,6 @@
 #include "decoder.h"
 
+#include <cstdio>
 #include <cstring>
 
 #include "catalog.h"
@@ -82,6 +83,65 @@ void emit_text(Decoder::Sink sink, void *ctx, uint16_t id, const char *text) {
   v.kind = DecodedValue::Kind::TEXT;
   v.id = id;
   std::strncpy(v.text, text, sizeof(v.text) - 1);
+  sink(ctx, v);
+}
+
+void append_char(char *out, size_t cap, size_t *len, char ch) {
+  if (*len + 1 >= cap)
+    return;
+  out[(*len)++] = ch;
+  out[*len] = '\0';
+}
+
+void append_string(char *out, size_t cap, size_t *len, const char *text) {
+  while (*text != '\0')
+    append_char(out, cap, len, *text++);
+}
+
+void append_header(char *out, size_t cap, size_t *len, uint64_t key) {
+  static constexpr char DIGITS[] = "0123456789ABCDEF";
+  for (int shift = 36; shift >= 0; shift -= 4)
+    append_char(out, cap, len, DIGITS[(key >> shift) & 0x0F]);
+}
+
+void emit_raw_frame(const Frame &f, Decoder::Sink sink, void *ctx) {
+  if (sink == nullptr || !f.has_payload())
+    return;
+
+  DecodedValue v{};
+  v.kind = DecodedValue::Kind::RAW_FRAME;
+  v.id = frame_entity_id(f.header_key());
+  size_t len = 0;
+  v.raw_frame[0] = '\0';
+
+  if (v.id == ENT_UNKNOWN_FRAME) {
+    append_header(v.raw_frame, sizeof(v.raw_frame), &len, f.header_key());
+    append_char(v.raw_frame, sizeof(v.raw_frame), &len, ':');
+  }
+
+  const uint8_t payload_len = f.payload_len() < f.buffered_payload_len() ? f.payload_len()
+                                                                         : f.buffered_payload_len();
+  if (payload_len == 0)
+    append_string(v.raw_frame, sizeof(v.raw_frame), &len, "EMPTY");
+  static constexpr char DIGITS[] = "0123456789ABCDEF";
+  for (uint8_t i = 0; i < payload_len; i++) {
+    append_char(v.raw_frame, sizeof(v.raw_frame), &len, DIGITS[f.payload()[i] >> 4]);
+    append_char(v.raw_frame, sizeof(v.raw_frame), &len, DIGITS[f.payload()[i] & 0x0F]);
+  }
+  if (payload_len < f.payload_len())
+    append_char(v.raw_frame, sizeof(v.raw_frame), &len, '!');
+
+  if (payload_len == f.payload_len() && (payload_len == 1 || payload_len == 2 || payload_len == 4)) {
+    uint32_t value = 0;
+    for (uint8_t i = 0; i < payload_len; i++)
+      value = (value << 8) | f.payload()[i];
+    char decimal[11];
+    std::snprintf(decimal, sizeof(decimal), "%u", static_cast<unsigned>(value));
+    append_string(v.raw_frame, sizeof(v.raw_frame), &len, " [BE=");
+    append_string(v.raw_frame, sizeof(v.raw_frame), &len, decimal);
+    append_char(v.raw_frame, sizeof(v.raw_frame), &len, ']');
+  }
+
   sink(ctx, v);
 }
 
@@ -252,6 +312,12 @@ void Decoder::decode(const Frame &f, Sink sink, void *ctx) const {
         stats_.unknown_headers++;
       break;
   }
+}
+
+void Decoder::decode_raw_frame(const Frame &f, Sink sink, void *ctx) const {
+  if (!f.crc_valid())
+    return;
+  emit_raw_frame(f, sink, ctx);
 }
 
 }  // namespace atlantic_v5

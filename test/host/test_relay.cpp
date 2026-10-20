@@ -131,8 +131,8 @@ void append_crc(std::vector<uint8_t> &frame) {
 }  // namespace
 
 int main() {
-  // --- Heating-element override is opt-in, writes only the observed command
-  // values (00/64), and preserves valid CRC requirements. ---
+  // --- Heating-element select defaults to passthrough and overrides only
+  // observed command values (00/64), with valid CRC requirements. ---
   {
     auto bytes = std::vector<uint8_t>{0x01, 0x65, 0xFE, 0xF7, 0x01, 0x01, 0x00, 0, 0};
     append_crc(bytes);
@@ -142,19 +142,24 @@ int main() {
     CHECK(!policy.apply(passthrough));
     CHECK(passthrough.raw()[6] == 0x00);
 
-    policy.set_heating_element_active(true);
+    policy.set_heating_element_mode(atlantic_v5::HeatingElementMode::ON);
     Frame forced_on(Channel::HMI, bytes.data(), static_cast<uint8_t>(bytes.size()));
     CHECK(policy.apply(forced_on));
     CHECK(forced_on.raw()[6] == 0x64);
     CHECK(forced_on.crc_valid());
 
-    policy.set_heating_element_active(false);
+    policy.set_heating_element_mode(atlantic_v5::HeatingElementMode::OFF);
     bytes[6] = 0x64;
     append_crc(bytes);
     Frame forced_off(Channel::HMI, bytes.data(), static_cast<uint8_t>(bytes.size()));
     CHECK(policy.apply(forced_off));
     CHECK(forced_off.raw()[6] == 0x00);
     CHECK(forced_off.crc_valid());
+
+    policy.set_heating_element_mode(atlantic_v5::HeatingElementMode::PASSTHROUGH);
+    Frame restored_passthrough(Channel::HMI, bytes.data(), static_cast<uint8_t>(bytes.size()));
+    CHECK(!policy.apply(restored_passthrough));
+    CHECK(restored_passthrough.raw()[6] == 0x64);
 
     Frame wrong_direction(Channel::MAIN, bytes.data(), static_cast<uint8_t>(bytes.size()));
     CHECK(!policy.apply(wrong_direction));
@@ -174,16 +179,16 @@ int main() {
     CHECK(bad_crc.raw()[6] == 0x64);
   }
 
-  // --- Compressor control is Auto by default, and only overrides the
+  // --- Compressor control is Passthrough by default, and only overrides the
   // candidate HMI command when Off or On is selected. ---
   {
     std::vector<uint8_t> command{0x01, 0x65, 0xFE, 0xF9, 0x01, 0x01, 0x64, 0, 0};
     append_crc(command);
 
     RelayPolicy policy;
-    Frame auto_mode(Channel::HMI, command.data(), static_cast<uint8_t>(command.size()));
-    CHECK(!policy.apply(auto_mode));
-    CHECK(auto_mode.raw()[6] == 0x64);
+    Frame passthrough_mode(Channel::HMI, command.data(), static_cast<uint8_t>(command.size()));
+    CHECK(!policy.apply(passthrough_mode));
+    CHECK(passthrough_mode.raw()[6] == 0x64);
 
     policy.set_compressor_mode(atlantic_v5::CompressorMode::OFF);
     Frame forced_off(Channel::HMI, command.data(), static_cast<uint8_t>(command.size()));
@@ -199,10 +204,10 @@ int main() {
     CHECK(forced_on.raw()[6] == 0x64);
     CHECK(forced_on.crc_valid());
 
-    policy.set_compressor_mode(atlantic_v5::CompressorMode::AUTO);
-    Frame restored_auto(Channel::HMI, command.data(), static_cast<uint8_t>(command.size()));
-    CHECK(!policy.apply(restored_auto));
-    CHECK(restored_auto.raw()[6] == 0x00);
+    policy.set_compressor_mode(atlantic_v5::CompressorMode::PASSTHROUGH);
+    Frame restored_passthrough(Channel::HMI, command.data(), static_cast<uint8_t>(command.size()));
+    CHECK(!policy.apply(restored_passthrough));
+    CHECK(restored_passthrough.raw()[6] == 0x00);
 
     policy.set_compressor_mode(atlantic_v5::CompressorMode::ON);
     Frame wrong_direction(Channel::MAIN, command.data(), static_cast<uint8_t>(command.size()));
@@ -254,7 +259,7 @@ int main() {
   {
     MockBusIo hmi_io, main_io;
     RelayPolicy policy;
-    policy.set_heating_element_active(true);
+    policy.set_heating_element_mode(atlantic_v5::HeatingElementMode::ON);
     Relay relay(hmi_io, main_io, policy);
     bool observed_command = false;
     relay.set_frame_sink(

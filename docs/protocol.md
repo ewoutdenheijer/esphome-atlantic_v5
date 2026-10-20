@@ -559,19 +559,19 @@ Hard constraints for the input-status rewrite:
   PV or smart-grid inputs. If it is not, the rewrite is accepted on the bus but
   does nothing.
 
-  The compressor candidate `0x0165FEF901` described above has an experimental
-  rewrite control, but its effect has not been established; do not treat it as an
-  understood control path.
+The compressor candidate `0x0165FEF901` described above has an experimental
+rewrite control, but its effect has not been established; do not treat it as an
+understood control path.
 
-  `0x0165FEF701` can also be overridden in MITM mode by the optional
-`heating_element` switch (README): the switch forces the observed one-byte
-values `00` or `64` on matching HMI-origin commands. The frame is otherwise
-forwarded unchanged, and the decoder continues to publish the received value.
+`0x0165FEF701` can also be overridden in MITM mode by the optional
+`heating_element` select (README): `passthrough` leaves matching HMI-origin
+commands unchanged, while `off` and `on` force `00` and `64`. The decoder
+continues to publish the received value.
 
 **Experimental compressor candidate.** `0x0165FEF901` is an HMI-origin one-byte
 write whose `00`/`64` value tracks the compressor's apparent run span in the
 captures. That correlation does not prove the value controls it. The optional
-`compressor_mode` select (README) passes the frame through in `auto`, or
+`compressor_mode` select (README) passes the frame through in `passthrough`, or
 rewrites matching CRC-valid HMI frames to `00` (`off`) or `64` (`on`). It never
 generates a frame. Until a controlled test with independent compressor power
 measurement confirms the effect, do not rely on `off` or `on` as a control or

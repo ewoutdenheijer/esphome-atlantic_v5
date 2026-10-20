@@ -1,7 +1,6 @@
 #include "atlantic_v5_switch.h"
 
-#if defined(USE_SWITCH) && \
-    (defined(ATLANTIC_V5_LINK_BLACKOUT) || defined(ATLANTIC_V5_HEATING_ELEMENT_OVERRIDE))
+#if defined(USE_SWITCH) && defined(ATLANTIC_V5_LINK_BLACKOUT)
 
 namespace esphome {
 namespace atlantic_v5_component {
@@ -22,18 +21,6 @@ void AtlanticV5LinkBlackoutSwitch::loop() {
 void AtlanticV5LinkBlackoutSwitch::write_state(bool state) {
   this->parent_->request_link_blackout(state);
   this->publish_state(this->parent_->link_blackout_engaged());
-}
-#endif
-
-#ifdef ATLANTIC_V5_HEATING_ELEMENT_OVERRIDE
-void AtlanticV5HeatingElementSwitch::setup() {
-  this->parent_->set_heating_element_active(false);
-  this->publish_state(false);
-}
-
-void AtlanticV5HeatingElementSwitch::write_state(bool state) {
-  this->parent_->set_heating_element_active(state);
-  this->publish_state(state);
 }
 #endif
 

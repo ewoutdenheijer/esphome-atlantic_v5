@@ -1,8 +1,5 @@
-// L3 ESPHome glue. The control_mode select (docs/protocol.md "Control surface"):
-// the only entity
-// whose action writes into shared runtime state (RelayPolicy), so it earns
-// its own dedicated class (ADR 0001), unlike the read-only sensor/
-// binary_sensor/text_sensor platforms.
+// L3 ESPHome glue for selects that write shared runtime state (RelayPolicy),
+// unlike the read-only sensor/binary_sensor/text_sensor platforms.
 #pragma once
 
 // Included before the USE_SELECT check below: this header is the first thing
@@ -31,6 +28,14 @@ class AtlanticV5Select : public Component, public select::Select, public Parente
 };
 
 class AtlanticV5CompressorSelect : public Component, public select::Select, public Parented<AtlanticV5Component> {
+ public:
+  void setup() override;
+
+ protected:
+  void control(size_t index) override;
+};
+
+class AtlanticV5HeatingElementSelect : public Component, public select::Select, public Parented<AtlanticV5Component> {
  public:
   void setup() override;
 

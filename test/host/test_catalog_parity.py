@@ -7,12 +7,14 @@ The Python `ENT_*` constants must stay in lockstep with
 member surfaces as a compile error at best and as an entity publishing another
 entity's value at worst.
 
-Three lists are checked against each other:
+Four sources are checked against each other:
 
 1. `EntityId` in catalog.h            — the ids themselves, in order
 2. `NAMES[]` in catalog.cpp           — `entity_name(id)`, used in replay JSON
 3. `SENSORS` / `BINARY_SENSORS` / `TEXT_SENSORS` in the platform .py files
    — the YAML keys users write, and the id each maps to
+4. `header::MAPPED` / `header::UNMAPPED` — one raw-frame text entity per key,
+   plus the unknown-frame catch-all
 """
 
 from __future__ import annotations
@@ -28,6 +30,9 @@ ENUM_RE = re.compile(r"enum EntityId : uint16_t \{(.*?)\n\};", re.DOTALL)
 ENUM_MEMBER_RE = re.compile(r"^\s*(ENT_[A-Z0-9_]+)\b", re.MULTILINE)
 NAMES_RE = re.compile(r"constexpr const char \*NAMES\[ENT_COUNT\] = \{(.*?)\n\};", re.DOTALL)
 STRING_RE = re.compile(r'"([^"]*)"')
+HEADER_CONST_RE = re.compile(r"constexpr uint64_t ([A-Z0-9_]+) = (0x[0-9A-Fa-f]+)ULL;")
+HEADER_ARRAY_RE = re.compile(r"constexpr uint64_t (MAPPED|UNMAPPED)\[\] = \{(.*?)\n\};", re.DOTALL)
+HEADER_ITEM_RE = re.compile(r"(0x[0-9A-Fa-f]+ULL|[A-Z][A-Z0-9_]*)")
 # Matches `"yaml_key": ("ENT_X", ...)` and `"yaml_key": "ENT_X"`, across newlines.
 PY_ENTRY_RE = re.compile(r'"([a-z0-9_]+)"\s*:\s*\(?\s*"(ENT_[A-Z0-9_]+)"')
 
@@ -66,6 +71,27 @@ def main() -> int:
         f"catalog.cpp NAMES[] has {len(names)} entries but EntityId has {len(ids)} ids before ENT_COUNT",
     )
     check(len(set(names)) == len(names), "duplicate entity names in catalog.cpp NAMES[]")
+
+    catalog_h_text = catalog_h.read_text()
+    header_values = {name: int(value, 16) for name, value in HEADER_CONST_RE.findall(catalog_h_text)}
+    header_arrays = {
+        table: [
+            int(item[:-3], 16) if item.startswith("0x") else header_values[item]
+            for item in HEADER_ITEM_RE.findall(body)
+            if item.startswith("0x") or item in header_values
+        ]
+        for table, body in HEADER_ARRAY_RE.findall(catalog_h_text)
+    }
+    expected_frame_names = [
+        f"frame_{key:010x}"
+        for table in ("MAPPED", "UNMAPPED")
+        for key in header_arrays.get(table, [])
+    ] + ["unknown_frame"]
+    frame_names = [name for name in names if name.startswith("frame_") or name == "unknown_frame"]
+    check(
+        frame_names == expected_frame_names,
+        "raw-frame entity names must cover MAPPED and UNMAPPED headers in catalog order, plus unknown_frame",
+    )
 
     index_of = {name: i for i, name in enumerate(ids)}
     exposed: dict[str, str] = {}

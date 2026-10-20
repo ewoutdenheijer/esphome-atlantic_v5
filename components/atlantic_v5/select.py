@@ -14,9 +14,13 @@ AtlanticV5Select = atlantic_v5_ns.class_("AtlanticV5Select", select.Select, cg.C
 AtlanticV5CompressorSelect = atlantic_v5_ns.class_(
     "AtlanticV5CompressorSelect", select.Select, cg.Component
 )
+AtlanticV5HeatingElementSelect = atlantic_v5_ns.class_(
+    "AtlanticV5HeatingElementSelect", select.Select, cg.Component
+)
 
 CONF_CONTROL_MODE = "control_mode"
 CONF_COMPRESSOR_MODE = "compressor_mode"
+CONF_HEATING_ELEMENT = "heating_element"
 
 # The control surface's modes (docs/protocol.md), in ControlMode enum order
 # (types.h): the option's index is the wire value the rewrite hook applies, so
@@ -27,19 +31,22 @@ OPTION_EAGER = "eager"
 OPTION_OFF = "off"
 OPTION_BOOST = "boost"
 OPTIONS = [OPTION_PASSTHROUGH, OPTION_NORMAL, OPTION_EAGER, OPTION_OFF, OPTION_BOOST]
-COMPRESSOR_OPTIONS = ["auto", "off", "on"]
+COMMAND_OPTIONS = ["passthrough", "off", "on"]
 
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(CONF_ATLANTIC_V5_ID): cv.use_id(AtlanticV5Component),
         cv.Optional(CONF_CONTROL_MODE): select.select_schema(AtlanticV5Select),
         cv.Optional(CONF_COMPRESSOR_MODE): select.select_schema(AtlanticV5CompressorSelect),
+        cv.Optional(CONF_HEATING_ELEMENT): select.select_schema(AtlanticV5HeatingElementSelect),
     }
 )
 
 
 def _final_validate(config):
-    configured = [key for key in (CONF_CONTROL_MODE, CONF_COMPRESSOR_MODE) if key in config]
+    configured = [
+        key for key in (CONF_CONTROL_MODE, CONF_COMPRESSOR_MODE, CONF_HEATING_ELEMENT) if key in config
+    ]
     if not configured:
         return
     fconf = final_validate.full_config.get()
@@ -56,6 +63,11 @@ def _final_validate(config):
                 "compressor_mode requires atlantic_v5 mode: mitm (rewriting frames only works in MITM mode)",
                 path=[CONF_COMPRESSOR_MODE],
             )
+        if CONF_HEATING_ELEMENT in configured:
+            raise cv.Invalid(
+                "heating_element requires atlantic_v5 mode: mitm (rewriting frames only works in MITM mode)",
+                path=[CONF_HEATING_ELEMENT],
+            )
 
 
 FINAL_VALIDATE_SCHEMA = _final_validate
@@ -71,6 +83,12 @@ async def to_code(config):
 
     if CONF_COMPRESSOR_MODE in config:
         conf = config[CONF_COMPRESSOR_MODE]
-        var = await select.new_select(conf, options=COMPRESSOR_OPTIONS)
+        var = await select.new_select(conf, options=COMMAND_OPTIONS)
+        await cg.register_component(var, conf)
+        cg.add(var.set_parent(hub))
+
+    if CONF_HEATING_ELEMENT in config:
+        conf = config[CONF_HEATING_ELEMENT]
+        var = await select.new_select(conf, options=COMMAND_OPTIONS)
         await cg.register_component(var, conf)
         cg.add(var.set_parent(hub))

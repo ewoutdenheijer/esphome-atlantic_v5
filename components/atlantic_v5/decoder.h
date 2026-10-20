@@ -9,16 +9,17 @@
 
 namespace atlantic_v5 {
 
-// Emitted by Decoder::decode, one per catalogued value inside a frame's payload.
-// id is an EntityId (catalog.h); kept as a raw uint16_t here so
-// this header doesn't need to depend on catalog.h.
+// Emitted by Decoder for either a decoded value or a raw frame payload. id is
+// an EntityId (catalog.h); kept as a raw uint16_t here so this header doesn't
+// need to depend on catalog.h.
 struct DecodedValue {
-  enum class Kind : uint8_t { FLOAT, BOOL, TEXT, UINT } kind;
+  enum class Kind : uint8_t { FLOAT, BOOL, TEXT, UINT, RAW_FRAME } kind;
   uint16_t id;
   float f = 0;
   bool b = false;
   uint32_t u = 0;
   char text[24] = {};
+  char raw_frame[64] = {};
 };
 
 // The seven payload codecs (docs/protocol.md "Payload codecs"), each operating on a
@@ -68,6 +69,12 @@ class Decoder {
   // neither table counts as stats().unknown_headers. Both emit nothing
   // (passthrough-and-count).
   void decode(const Frame &f, Sink sink, void *ctx) const;
+
+  // Emits a raw hexadecimal state for every CRC-valid, payload-bearing frame.
+  // Known headers have individual entity ids; all other headers share the
+  // unknown-message entity. Payload-less READ requests and WRITE acknowledgments
+  // have no data to publish and are skipped.
+  void decode_raw_frame(const Frame &f, Sink sink, void *ctx) const;
 
   struct Stats {
     uint32_t unknown_headers = 0;

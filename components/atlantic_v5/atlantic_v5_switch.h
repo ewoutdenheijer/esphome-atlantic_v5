@@ -7,8 +7,7 @@
 // includes, so nothing has pulled defines.h in yet.
 #include "esphome/core/defines.h"
 
-#if defined(USE_SWITCH) && \
-    (defined(ATLANTIC_V5_LINK_BLACKOUT) || defined(ATLANTIC_V5_HEATING_ELEMENT_OVERRIDE))
+#if defined(USE_SWITCH) && defined(ATLANTIC_V5_LINK_BLACKOUT)
 
 #include "esphome/components/switch/switch.h"
 #include "esphome/core/component.h"
@@ -30,18 +29,7 @@ class AtlanticV5LinkBlackoutSwitch : public Component, public switch_::Switch, p
 };
 #endif
 
-#ifdef ATLANTIC_V5_HEATING_ELEMENT_OVERRIDE
-class AtlanticV5HeatingElementSwitch : public Component, public switch_::Switch,
-                                       public Parented<AtlanticV5Component> {
- public:
-  void setup() override;
-
- protected:
-  void write_state(bool state) override;
-};
-#endif
-
 }  // namespace atlantic_v5_component
 }  // namespace esphome
 
-#endif  // USE_SWITCH && (ATLANTIC_V5_LINK_BLACKOUT || ATLANTIC_V5_HEATING_ELEMENT_OVERRIDE)
+#endif  // USE_SWITCH && ATLANTIC_V5_LINK_BLACKOUT

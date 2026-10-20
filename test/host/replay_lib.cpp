@@ -61,6 +61,11 @@ void append_value_json(std::string &out, const atlantic_v5::DecodedValue &v) {
       out += v.text;
       out += "\"";
       break;
+    case atlantic_v5::DecodedValue::Kind::RAW_FRAME:
+      out += "\"s\":\"";
+      out += v.raw_frame;
+      out += "\"";
+      break;
   }
   out += "}";
 }

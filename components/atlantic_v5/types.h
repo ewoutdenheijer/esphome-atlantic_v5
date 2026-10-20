@@ -51,7 +51,13 @@ enum class ControlMode : uint8_t {
 };
 
 enum class CompressorMode : uint8_t {
-  AUTO = 0,
+  PASSTHROUGH = 0,
+  OFF = 1,
+  ON = 2,
+};
+
+enum class HeatingElementMode : uint8_t {
+  PASSTHROUGH = 0,
   OFF = 1,
   ON = 2,
 };

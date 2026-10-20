@@ -173,6 +173,107 @@ text_sensor:
       name: HMI version
     hmi_model:
       name: HMI model
+    # Raw payloads by header; payload-less requests/acks are skipped.
+    frame_0164006401:
+      name: Raw frame 0x0164006401
+    frame_0164006501:
+      name: Raw frame 0x0164006501
+    frame_0164006601:
+      name: Raw frame 0x0164006601
+    frame_0164006701:
+      name: Raw frame 0x0164006701
+    frame_0164006e01:
+      name: Raw frame 0x0164006E01
+    frame_016414b701:
+      name: Raw frame 0x016414B701
+    frame_0164158301:
+      name: Raw frame 0x0164158301
+    frame_0164feb006:
+      name: Raw frame 0x0164FEB006
+    frame_0164feba03:
+      name: Raw frame 0x0164FEBA03
+    frame_0164febd03:
+      name: Raw frame 0x0164FEBD03
+    frame_0164fec003:
+      name: Raw frame 0x0164FEC003
+    frame_0164fec303:
+      name: Raw frame 0x0164FEC303
+    frame_0164fec603:
+      name: Raw frame 0x0164FEC603
+    frame_0164fec903:
+      name: Raw frame 0x0164FEC903
+    frame_0164fee203:
+      name: Raw frame 0x0164FEE203
+    frame_0164fee503:
+      name: Raw frame 0x0164FEE503
+    frame_0164fee803:
+      name: Raw frame 0x0164FEE803
+    frame_0164feeb03:
+      name: Raw frame 0x0164FEEB03
+    frame_0164feee03:
+      name: Raw frame 0x0164FEEE03
+    frame_0164fef103:
+      name: Raw frame 0x0164FEF103
+    frame_0164ff1403:
+      name: Raw frame 0x0164FF1403
+    frame_0165000301:
+      name: Raw frame 0x0165000301
+    frame_0165000a01:
+      name: Raw frame 0x0165000A01
+    frame_0165fef701:
+      name: Raw frame 0x0165FEF701
+    frame_0164007001:
+      name: Raw frame 0x0164007001
+    frame_0164007101:
+      name: Raw frame 0x0164007101
+    frame_0164007501:
+      name: Raw frame 0x0164007501
+    frame_01640165fe:
+      name: Raw frame 0x01640165FE
+    frame_0164152a01:
+      name: Raw frame 0x0164152A01
+    frame_016421b601:
+      name: Raw frame 0x016421B601
+    frame_016443130d:
+      name: Raw frame 0x016443130D
+    frame_0164fded01:
+      name: Raw frame 0x0164FDED01
+    frame_0164fdee01:
+      name: Raw frame 0x0164FDEE01
+    frame_0164fdfa01:
+      name: Raw frame 0x0164FDFA01
+    frame_0164fdfd01:
+      name: Raw frame 0x0164FDFD01
+    frame_0164fe0001:
+      name: Raw frame 0x0164FE0001
+    frame_0164fed801:
+      name: Raw frame 0x0164FED801
+    frame_0164ffdc01:
+      name: Raw frame 0x0164FFDC01
+    frame_0165152301:
+      name: Raw frame 0x0165152301
+    frame_016516b301:
+      name: Raw frame 0x016516B301
+    frame_0165fdf802:
+      name: Raw frame 0x0165FDF802
+    frame_0165fdfb02:
+      name: Raw frame 0x0165FDFB02
+    frame_0165fdfe02:
+      name: Raw frame 0x0165FDFE02
+    frame_0165fef901:
+      name: Raw frame 0x0165FEF901
+    frame_0165fefb01:
+      name: Raw frame 0x0165FEFB01
+    frame_0165fefd01:
+      name: Raw frame 0x0165FEFD01
+    frame_0165feff01:
+      name: Raw frame 0x0165FEFF01
+    frame_0165ff0101:
+      name: Raw frame 0x0165FF0101
+    frame_0165ff0301:
+      name: Raw frame 0x0165FF0301
+    unknown_frame:
+      name: Unknown frame
 
 select:
   - platform: atlantic_v5
@@ -180,9 +281,5 @@ select:
       name: Operation mode
     compressor_mode:
       name: Compressor mode
-
-switch:
-  - platform: atlantic_v5
-    # Forces 0x0165FEF701 commands off at boot; turn on to force payload 0x64.
     heating_element:
-      name: Heating element command
+      name: Heating element command mode

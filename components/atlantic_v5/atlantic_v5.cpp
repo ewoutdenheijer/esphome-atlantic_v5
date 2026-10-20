@@ -198,6 +198,7 @@ void AtlanticV5Component::loop_mitm() {
     // pre-rewrite payload back before decoding.
     if (ev.modified)
       f.replace_payload(ev.observed_payload);
+    this->decoder_.decode_raw_frame(f, &AtlanticV5Component::publish_trampoline, this);
     this->decoder_.decode(f, &AtlanticV5Component::publish_trampoline, this);
   }
   uint32_t now_us32 = static_cast<uint32_t>(esp_timer_get_time());
@@ -327,7 +328,9 @@ void AtlanticV5Component::maybe_capture_frame(const ::atlantic_v5::Frame &f) {
 
 void AtlanticV5Component::frame_capture_trampoline(void *ctx, const ::atlantic_v5::Frame &f, uint32_t t_us) {
   (void) t_us;
-  static_cast<AtlanticV5Component *>(ctx)->maybe_capture_frame(f);
+  auto *self = static_cast<AtlanticV5Component *>(ctx);
+  self->maybe_capture_frame(f);
+  self->decoder_.decode_raw_frame(f, &AtlanticV5Component::publish_trampoline, self);
 }
 
 void AtlanticV5Component::restore_trampoline(void *ctx, const ::atlantic_v5::DecodedValue &v) {
@@ -430,9 +433,26 @@ void AtlanticV5Component::publish_to_entity(const ::atlantic_v5::DecodedValue &v
       break;
     }
     case EntityKind::TEXT_SENSOR: {
-      if (v.kind != ::atlantic_v5::DecodedValue::Kind::TEXT)
+      const char *text;
+      if (v.kind == ::atlantic_v5::DecodedValue::Kind::RAW_FRAME) {
+        if (v.id < ::atlantic_v5::ENT_FRAME_FIRST)
+          return;
+        const size_t index = v.id - ::atlantic_v5::ENT_FRAME_FIRST;
+        if (index >= ::atlantic_v5::FRAME_ENTITY_COUNT)
+          return;
+        if (this->has_last_frame_state_[index] &&
+            std::strcmp(this->last_frame_states_[index], v.raw_frame) == 0)
+          return;
+        std::strncpy(this->last_frame_states_[index], v.raw_frame, sizeof(this->last_frame_states_[index]) - 1);
+        this->last_frame_states_[index][sizeof(this->last_frame_states_[index]) - 1] = '\0';
+        this->has_last_frame_state_[index] = true;
+        text = v.raw_frame;
+      } else if (v.kind == ::atlantic_v5::DecodedValue::Kind::TEXT) {
+        text = v.text;
+      } else {
         return;
-      static_cast<text_sensor::TextSensor *>(obj)->publish_state(v.text);
+      }
+      static_cast<text_sensor::TextSensor *>(obj)->publish_state(text);
       break;
     }
   }

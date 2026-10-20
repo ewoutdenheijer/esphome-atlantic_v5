@@ -52,7 +52,7 @@ _Avoid_: timeout (that is the MAIN-quiet staleness gate)
 The window after a write to a Side during which bytes arriving back on that same Side are our own transceiver's echo, and are discarded rather than framed. MITM only, and not configurable: `flush_input()` after each write already removes the echo, so this is only a backstop for a byte that lands after that flush.
 
 **Controllable entity**:
-An entity whose ESPHome-side action writes into shared runtime state read by the relay task. The `select` control-mode and compressor-mode entities and the `switch` heating-element entity write into RelayPolicy; the `switch` link-blackout entity writes into Relay.
+An entity whose ESPHome-side action writes into shared runtime state read by the relay task. The `select` control-mode, compressor-mode and heating-element entities write into RelayPolicy; the `switch` link-blackout entity writes into Relay.
 _Avoid_: writable entity
 
 **Read-only entity**:

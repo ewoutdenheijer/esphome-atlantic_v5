@@ -64,6 +64,56 @@ constexpr const char *NAMES[ENT_COUNT] = {
     "relay_latency_avg_us",
     "task_stack_free",
     "connected",
+    "frame_0164006401",
+    "frame_0164006501",
+    "frame_0164006601",
+    "frame_0164006701",
+    "frame_0164006e01",
+    "frame_016414b701",
+    "frame_0164158301",
+    "frame_0164feb006",
+    "frame_0164feba03",
+    "frame_0164febd03",
+    "frame_0164fec003",
+    "frame_0164fec303",
+    "frame_0164fec603",
+    "frame_0164fec903",
+    "frame_0164fee203",
+    "frame_0164fee503",
+    "frame_0164fee803",
+    "frame_0164feeb03",
+    "frame_0164feee03",
+    "frame_0164fef103",
+    "frame_0164ff1403",
+    "frame_0165000301",
+    "frame_0165000a01",
+    "frame_0165fef701",
+    "frame_0164007001",
+    "frame_0164007101",
+    "frame_0164007501",
+    "frame_01640165fe",
+    "frame_0164152a01",
+    "frame_016421b601",
+    "frame_016443130d",
+    "frame_0164fded01",
+    "frame_0164fdee01",
+    "frame_0164fdfa01",
+    "frame_0164fdfd01",
+    "frame_0164fe0001",
+    "frame_0164fed801",
+    "frame_0164ffdc01",
+    "frame_0165152301",
+    "frame_016516b301",
+    "frame_0165fdf802",
+    "frame_0165fdfb02",
+    "frame_0165fdfe02",
+    "frame_0165fef901",
+    "frame_0165fefb01",
+    "frame_0165fefd01",
+    "frame_0165feff01",
+    "frame_0165ff0101",
+    "frame_0165ff0301",
+    "unknown_frame",
 };
 }  // namespace
 
@@ -104,6 +154,16 @@ HeaderClass classify_header(uint64_t key) {
 
 bool is_unmapped_header(uint64_t key) {
   return classify_header(key) == HeaderClass::UNMAPPED;
+}
+
+EntityId frame_entity_id(uint64_t key) {
+  for (size_t i = 0; i < header::MAPPED_COUNT; i++)
+    if (header::MAPPED[i] == key)
+      return static_cast<EntityId>(ENT_FRAME_MAPPED_FIRST + i);
+  for (size_t i = 0; i < header::UNMAPPED_COUNT; i++)
+    if (header::UNMAPPED[i] == key)
+      return static_cast<EntityId>(ENT_FRAME_UNMAPPED_FIRST + i);
+  return ENT_UNKNOWN_FRAME;
 }
 
 }  // namespace atlantic_v5

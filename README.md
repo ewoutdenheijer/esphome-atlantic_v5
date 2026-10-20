@@ -76,15 +76,15 @@ atlantic_v5:
 ```
 
 `tx_pin` is rejected in this mode and `tx_enable_pin` is unused — the component
-never drives the bus in `listener`. A `select: control_mode` entity is rejected
-at compile time too (see "Control (MITM only)" below); there's nothing to
-rewrite without a second UART sitting in the middle.
+never drives the bus in `listener`. The `control_mode` and `compressor_mode`
+selects are rejected at compile time too (see "Control (MITM only)" below);
+there's nothing to rewrite without a second UART sitting in the middle.
 
 ### `mitm` — relay + optional rewrite
 
 The direct HMI–MAIN wire is cut; HMI connects to one transceiver, MAIN to the
 other, and the component relays every frame between them on a dedicated,
-pinned FreeRTOS task, with an optional rewrite of one known frame (see
+pinned FreeRTOS task, with optional rewrites of known commands (see
 "Control (MITM only)").
 
 ```yaml
@@ -362,14 +362,15 @@ select:
   - platform: atlantic_v5
     control_mode:
       name: Operation mode
+    compressor_mode:
+      name: Compressor mode
 ```
 
-The only frame this component is willing to alter in flight is the
-input-status frame (header `0164FF1403`), which reports the state of the
-unit's two external inputs (I2, I1) — typically wired to photovoltaic /
-smart-grid surplus contacts — plus a read-only heating-active status byte
-that is always copied through untouched. `control_mode` picks what the HMI is
-told those two inputs are doing:
+`control_mode` rewrites the input-status frame (header `0164FF1403`), which
+reports the state of the unit's two external inputs (I2, I1) — typically wired
+to photovoltaic / smart-grid surplus contacts — plus a read-only heating-active
+status byte that is always copied through untouched. `control_mode` picks what
+the HMI is told those two inputs are doing:
 
 | Option | I2 | I1 | Effect |
 |---|---|---|---|
@@ -384,7 +385,7 @@ told those two inputs are doing:
 - This only works in `mode: mitm`. In `mode: listener` the `select` platform
   is rejected at compile time with an explicit error — there's no second UART
   to rewrite anything on.
-- The rewrite only ever applies to this one frame, and only when its header,
+- The `control_mode` rewrite only applies to this frame, and only when its header,
   payload length, and CRC all match exactly; anything else is passed through
   byte-for-byte, unmodified, always (fail-safe by construction — a broken or
   misconfigured component degrades to a wire, never to a blocked bus).
@@ -394,6 +395,52 @@ told those two inputs are doing:
   effect — the unit simply ignores contacts it was never told to look at.
   There is no known way to query that configuration state from the bus, so
   this component cannot detect or warn about it.
+
+### Experimental compressor command override
+
+The `compressor_mode` select tests the candidate HMI command `0x0165FEF901`:
+`auto` passes it through unchanged, `off` rewrites its one-byte payload to
+`00`, and `on` rewrites it to `64`:
+
+| Option | Relay behavior |
+|---|---|
+| `auto` | Leave the HMI command unchanged |
+| `off` | Force matching commands to `00` |
+| `on` | Force matching commands to `64` |
+
+```yaml
+select:
+  - platform: atlantic_v5
+    compressor_mode:
+      name: Compressor mode
+```
+
+**Experimental: the compressor effect is not confirmed.** Captures show this
+HMI-origin value correlating with compressor operation, but do not establish
+that it is a command or that changing it will start or stop the compressor.
+This only rewrites matching CRC-valid, one-byte HMI frames in `mode: mitm`;
+it does not generate commands, and `auto` is the default at boot. Verify the
+result using independent power measurements and treat cycle/status entities as
+separate observations, not proof that this override succeeded.
+
+### Heating-element command override
+
+The `heating_element` switch forces the one-byte payload of HMI-origin
+`0x0165FEF701` commands to `00` when off or `64` (100%) when on:
+
+```yaml
+switch:
+  - platform: atlantic_v5
+    heating_element:
+      name: Heating element command
+```
+
+This only affects matching, CRC-valid commands as they pass from HMI to MAIN
+in `mode: mitm`; it does not generate a command or change the read-only
+`heating_element_active` sensor's observed value. The switch starts off after
+boot, so matching commands are forced to `00` until it is turned on. Omit the
+block to leave the frame untouched. The mapping and effect remain assumptions
+based on observed traffic; use with care.
 
 ## Link blackout (MITM only): `switch: link_blackout`
 

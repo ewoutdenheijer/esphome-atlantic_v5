@@ -14,13 +14,17 @@ from . import CONF_ATLANTIC_V5_ID, CONF_MODE, MODE_MITM, AtlanticV5Component, at
 DEPENDENCIES = ["atlantic_v5"]
 CODEOWNERS = ["@jsimonetti"]
 
-# Controllable entity (ADR 0001): write_state() reaches shared runtime state the
-# relay task reads, so it gets its own dedicated class.
+# Controllable entities (ADR 0001): their actions write shared runtime state
+# the relay task reads, so they get dedicated classes.
 AtlanticV5LinkBlackoutSwitch = atlantic_v5_ns.class_(
     "AtlanticV5LinkBlackoutSwitch", switch.Switch, cg.Component
 )
+AtlanticV5HeatingElementSwitch = atlantic_v5_ns.class_(
+    "AtlanticV5HeatingElementSwitch", switch.Switch, cg.Component
+)
 
 CONF_LINK_BLACKOUT = "link_blackout"
+CONF_HEATING_ELEMENT = "heating_element"
 
 DIRECTION_MAIN_TO_HMI = "main_to_hmi"
 DIRECTION_HMI_TO_MAIN = "hmi_to_main"
@@ -59,6 +63,15 @@ def _no_restore(conf):
     return conf
 
 
+def _heating_element_no_restore(conf):
+    if conf[CONF_RESTORE_MODE] != "ALWAYS_OFF":
+        raise cv.Invalid(
+            "heating_element is always off at boot and does not support restore_mode",
+            path=[CONF_RESTORE_MODE],
+        )
+    return conf
+
+
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(CONF_ATLANTIC_V5_ID): cv.use_id(AtlanticV5Component),
@@ -76,22 +89,34 @@ CONFIG_SCHEMA = cv.Schema(
             ),
             _no_restore,
         ),
+        cv.Optional(CONF_HEATING_ELEMENT): cv.All(
+            switch.switch_schema(AtlanticV5HeatingElementSwitch),
+            _heating_element_no_restore,
+        ),
     }
 )
 
 
 def _final_validate(config):
-    if CONF_LINK_BLACKOUT not in config:
+    configured = [key for key in (CONF_LINK_BLACKOUT, CONF_HEATING_ELEMENT) if key in config]
+    if not configured:
         return
     fconf = final_validate.full_config.get()
     hub_path = fconf.get_path_for_id(config[CONF_ATLANTIC_V5_ID])[:-1]
     hub_conf = fconf.get_config_for_path(hub_path)
-    if hub_conf[CONF_MODE] != MODE_MITM:
-        raise cv.Invalid(
-            "link_blackout requires atlantic_v5 mode: mitm (there is nothing to stop "
-            "forwarding in a passive tap)",
-            path=[CONF_LINK_BLACKOUT],
-        )
+    for key in configured:
+        if hub_conf[CONF_MODE] != MODE_MITM:
+            if key == CONF_LINK_BLACKOUT:
+                raise cv.Invalid(
+                    "link_blackout requires atlantic_v5 mode: mitm (there is nothing to stop "
+                    "forwarding in a passive tap)",
+                    path=[key],
+                )
+            raise cv.Invalid(
+                "heating_element requires atlantic_v5 mode: mitm (rewriting frames only works "
+                "in MITM mode)",
+                path=[key],
+            )
 
 
 FINAL_VALIDATE_SCHEMA = _final_validate
@@ -99,18 +124,23 @@ FINAL_VALIDATE_SCHEMA = _final_validate
 
 async def to_code(config):
     hub = await cg.get_variable(config[CONF_ATLANTIC_V5_ID])
-    if CONF_LINK_BLACKOUT not in config:
-        return
-    conf = config[CONF_LINK_BLACKOUT]
-    # The gate is the feature: without this flag Relay has no drop path compiled
-    # in, so a build whose config omits the entity cannot sever the control link.
-    cg.add_build_flag("-DATLANTIC_V5_LINK_BLACKOUT")
-    # Leading "::" for the same reason as the read-only platforms' ENT_* ids:
-    # ESPHome's generated main.cpp does `using namespace esphome;`, which makes
-    # an unqualified atlantic_v5:: ambiguous with esphome::atlantic_v5_component.
-    direction = cg.RawExpression(f"::atlantic_v5::BlackoutDirection::{DIRECTIONS[conf[CONF_DIRECTION]]}")
-    cg.add(hub.set_link_blackout_config(direction, conf[CONF_DURATION]))
+    if CONF_LINK_BLACKOUT in config:
+        conf = config[CONF_LINK_BLACKOUT]
+        # Without this flag Relay has no drop path compiled in.
+        cg.add_build_flag("-DATLANTIC_V5_LINK_BLACKOUT")
+        # Leading "::" avoids ambiguity with esphome::atlantic_v5_component.
+        direction = cg.RawExpression(
+            f"::atlantic_v5::BlackoutDirection::{DIRECTIONS[conf[CONF_DIRECTION]]}"
+        )
+        cg.add(hub.set_link_blackout_config(direction, conf[CONF_DURATION]))
 
-    var = await switch.new_switch(conf)
-    await cg.register_component(var, conf)
-    cg.add(var.set_parent(hub))
+        var = await switch.new_switch(conf)
+        await cg.register_component(var, conf)
+        cg.add(var.set_parent(hub))
+
+    if CONF_HEATING_ELEMENT in config:
+        cg.add_build_flag("-DATLANTIC_V5_HEATING_ELEMENT_OVERRIDE")
+        conf = config[CONF_HEATING_ELEMENT]
+        var = await switch.new_switch(conf)
+        await cg.register_component(var, conf)
+        cg.add(var.set_parent(hub))

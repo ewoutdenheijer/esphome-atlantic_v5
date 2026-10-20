@@ -35,10 +35,9 @@ namespace atlantic_v5_component {
 // Fixed at YAML/compile time; there is deliberately no automatic mode detection.
 enum class Mode : uint8_t { LISTENER, MITM };
 
-// Which ESPHome platform an entities_[] slot holds. Only
-// read-only entities register through this generic path (ADR 0001); the
-// control_mode select is controllable and gets its own dedicated class
-// (atlantic_v5_select.h).
+// Which ESPHome platform an entities_[] slot holds. Only read-only entities
+// register through this generic path (ADR 0001); control_mode and switch
+// controls get dedicated classes.
 enum class EntityKind : uint8_t { SENSOR, BINARY_SENSOR, TEXT_SENSOR };
 
 class AtlanticV5Component : public Component {
@@ -69,10 +68,10 @@ class AtlanticV5Component : public Component {
   // outlive this component; kind selects which publish_state overload to call.
   void set_entity(uint16_t id, void *obj, EntityKind kind);
 
-  // The control_mode select's write path: writes into policy_,
-  // which only Relay (mitm-only) ever reads, so it has no effect in listener
-  // mode - unreachable anyway, since select.py rejects control_mode there.
+  // Controllable entity write paths: the relay is the only reader of policy_.
   void set_control_mode(::atlantic_v5::ControlMode mode);
+  void set_compressor_mode(::atlantic_v5::CompressorMode mode) { this->policy_.set_compressor_mode(mode); }
+  void set_heating_element_active(bool active) { this->policy_.set_heating_element_active(active); }
 
 #ifdef ATLANTIC_V5_LINK_BLACKOUT
   // The link_blackout switch's write path. Compiled in only when switch.py put

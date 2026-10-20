@@ -108,9 +108,9 @@ void Relay::forward(Side &in, Side &out, Channel in_channel, uint32_t now_us) {
 
   // Snapshot the payload before the rewrite: the wire gets the rewritten frame,
   // the decoder gets what the appliance actually reported (ADR 0002).
-  uint8_t observed[REWRITE_PAYLOAD_LEN] = {};
-  if (f.payload_len() == REWRITE_PAYLOAD_LEN && f.buffered_payload_len() >= REWRITE_PAYLOAD_LEN)
-    std::memcpy(observed, f.payload(), REWRITE_PAYLOAD_LEN);
+  uint8_t observed[MAX_PAYLOAD] = {};
+  if (f.payload_len() <= MAX_PAYLOAD && f.buffered_payload_len() >= f.payload_len())
+    std::memcpy(observed, f.payload(), f.payload_len());
 
   // apply() is itself a no-op on a bad-CRC or non-matching frame, so a frame that
   // only got this far because forward_bad_crc is set still goes out exactly as

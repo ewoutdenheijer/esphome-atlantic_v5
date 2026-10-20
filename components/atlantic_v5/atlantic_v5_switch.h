@@ -1,8 +1,5 @@
-// L3 ESPHome glue. The link_blackout switch: like the control_mode select it
-// writes into shared runtime state the relay task reads, so it earns its own
-// class (ADR 0001). Unlike the select it is compile-time opt-in — the whole
-// file, and the Relay drop path it drives, only exist when switch.py put the
-// entity in the config.
+// L3 ESPHome glue for controllable switches (ADR 0001). Each feature is
+// compile-time opt-in through switch.py, so unconfigured controls are absent.
 #pragma once
 
 // Included before the USE_SWITCH check below for the same reason as in
@@ -10,7 +7,8 @@
 // includes, so nothing has pulled defines.h in yet.
 #include "esphome/core/defines.h"
 
-#if defined(USE_SWITCH) && defined(ATLANTIC_V5_LINK_BLACKOUT)
+#if defined(USE_SWITCH) && \
+    (defined(ATLANTIC_V5_LINK_BLACKOUT) || defined(ATLANTIC_V5_HEATING_ELEMENT_OVERRIDE))
 
 #include "esphome/components/switch/switch.h"
 #include "esphome/core/component.h"
@@ -21,6 +19,7 @@
 namespace esphome {
 namespace atlantic_v5_component {
 
+#ifdef ATLANTIC_V5_LINK_BLACKOUT
 class AtlanticV5LinkBlackoutSwitch : public Component, public switch_::Switch, public Parented<AtlanticV5Component> {
  public:
   void setup() override;
@@ -29,8 +28,20 @@ class AtlanticV5LinkBlackoutSwitch : public Component, public switch_::Switch, p
  protected:
   void write_state(bool state) override;
 };
+#endif
+
+#ifdef ATLANTIC_V5_HEATING_ELEMENT_OVERRIDE
+class AtlanticV5HeatingElementSwitch : public Component, public switch_::Switch,
+                                       public Parented<AtlanticV5Component> {
+ public:
+  void setup() override;
+
+ protected:
+  void write_state(bool state) override;
+};
+#endif
 
 }  // namespace atlantic_v5_component
 }  // namespace esphome
 
-#endif  // USE_SWITCH && ATLANTIC_V5_LINK_BLACKOUT
+#endif  // USE_SWITCH && (ATLANTIC_V5_LINK_BLACKOUT || ATLANTIC_V5_HEATING_ELEMENT_OVERRIDE)

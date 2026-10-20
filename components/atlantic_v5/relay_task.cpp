@@ -73,8 +73,8 @@ void RelayTask::push_event(Channel channel, const Frame &f, const uint8_t *obser
   ev.modified = f.modified();
   ev.crc_ok = f.crc_valid();
   ev.t_us = t_us;
-  if (observed_payload != nullptr)
-    memcpy(ev.observed_payload, observed_payload, REWRITE_PAYLOAD_LEN);
+  if (observed_payload != nullptr && f.payload_len() <= sizeof(ev.observed_payload))
+    memcpy(ev.observed_payload, observed_payload, f.payload_len());
 
   // On failure, count and drop — forwarding has already happened by
   // this point (this runs from Relay's frame sink, called after the write), so a

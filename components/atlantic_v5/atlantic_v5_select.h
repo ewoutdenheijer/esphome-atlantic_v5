@@ -30,6 +30,14 @@ class AtlanticV5Select : public Component, public select::Select, public Parente
   void control(size_t index) override;
 };
 
+class AtlanticV5CompressorSelect : public Component, public select::Select, public Parented<AtlanticV5Component> {
+ public:
+  void setup() override;
+
+ protected:
+  void control(size_t index) override;
+};
+
 }  // namespace atlantic_v5_component
 }  // namespace esphome
 

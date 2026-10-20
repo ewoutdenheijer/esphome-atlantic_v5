@@ -131,6 +131,85 @@ void append_crc(std::vector<uint8_t> &frame) {
 }  // namespace
 
 int main() {
+  // --- Heating-element override is opt-in, writes only the observed command
+  // values (00/64), and preserves valid CRC requirements. ---
+  {
+    auto bytes = std::vector<uint8_t>{0x01, 0x65, 0xFE, 0xF7, 0x01, 0x01, 0x00, 0, 0};
+    append_crc(bytes);
+
+    RelayPolicy policy;
+    Frame passthrough(Channel::HMI, bytes.data(), static_cast<uint8_t>(bytes.size()));
+    CHECK(!policy.apply(passthrough));
+    CHECK(passthrough.raw()[6] == 0x00);
+
+    policy.set_heating_element_active(true);
+    Frame forced_on(Channel::HMI, bytes.data(), static_cast<uint8_t>(bytes.size()));
+    CHECK(policy.apply(forced_on));
+    CHECK(forced_on.raw()[6] == 0x64);
+    CHECK(forced_on.crc_valid());
+
+    policy.set_heating_element_active(false);
+    bytes[6] = 0x64;
+    append_crc(bytes);
+    Frame forced_off(Channel::HMI, bytes.data(), static_cast<uint8_t>(bytes.size()));
+    CHECK(policy.apply(forced_off));
+    CHECK(forced_off.raw()[6] == 0x00);
+    CHECK(forced_off.crc_valid());
+
+    Frame wrong_direction(Channel::MAIN, bytes.data(), static_cast<uint8_t>(bytes.size()));
+    CHECK(!policy.apply(wrong_direction));
+    CHECK(wrong_direction.raw()[6] == 0x64);
+
+    auto wrong_length_bytes =
+        std::vector<uint8_t>{0x01, 0x65, 0xFE, 0xF7, 0x01, 0x02, 0x00, 0x00, 0, 0};
+    append_crc(wrong_length_bytes);
+    Frame wrong_length(Channel::HMI, wrong_length_bytes.data(),
+                       static_cast<uint8_t>(wrong_length_bytes.size()));
+    CHECK(!policy.apply(wrong_length));
+    CHECK(wrong_length.raw()[6] == 0x00);
+
+    bytes.back() ^= 0x01;
+    Frame bad_crc(Channel::HMI, bytes.data(), static_cast<uint8_t>(bytes.size()));
+    CHECK(!policy.apply(bad_crc));
+    CHECK(bad_crc.raw()[6] == 0x64);
+  }
+
+  // A rewritten one-byte command still carries its original payload to the
+  // decoder, while the far side receives the updated byte and CRC.
+  {
+    MockBusIo hmi_io, main_io;
+    RelayPolicy policy;
+    policy.set_heating_element_active(true);
+    Relay relay(hmi_io, main_io, policy);
+    bool observed_command = false;
+    relay.set_frame_sink(
+        [](void *ctx, Channel channel, const Frame &f, const uint8_t *observed, uint32_t) {
+          auto *seen = static_cast<bool *>(ctx);
+          CHECK(channel == Channel::HMI);
+          CHECK(f.raw()[6] == 0x64);
+          CHECK(observed != nullptr && observed[0] == 0x00);
+          *seen = true;
+        },
+        &observed_command);
+
+    std::vector<uint8_t> command{0x01, 0x65, 0xFE, 0xF7, 0x01, 0x01, 0x00, 0, 0};
+    append_crc(command);
+    hmi_io.queue(1000, command);
+    hmi_io.set_now(1000);
+    main_io.set_now(1000);
+    relay.poll(1000);
+    hmi_io.set_now(5000);
+    main_io.set_now(5000);
+    relay.poll(5000);
+
+    CHECK(observed_command);
+    CHECK(main_io.writes_.size() == 1);
+    CHECK(main_io.writes_[0][6] == 0x64);
+    Frame forwarded(Channel::MAIN, main_io.writes_[0].data(),
+                    static_cast<uint8_t>(main_io.writes_[0].size()));
+    CHECK(forwarded.crc_valid());
+  }
+
   // --- Clean replay, PASSTHROUGH: every input frame forwarded exactly once, in
   // order, byte-identical on the opposite side. ---
   {
@@ -483,7 +562,7 @@ int main() {
       std::vector<uint8_t> bytes;
       size_t writes_so_far;
       bool had_observed;
-      uint8_t observed[atlantic_v5::REWRITE_PAYLOAD_LEN];
+      uint8_t observed[atlantic_v5::MAX_PAYLOAD];
     };
     std::vector<Event> events;
     struct Ctx {
@@ -497,7 +576,7 @@ int main() {
           size_t writes = c->hmi_io->writes_.size() + c->main_io->writes_.size();
           Event ev{channel, std::vector<uint8_t>(f.raw(), f.raw() + f.raw_len()), writes, observed != nullptr, {}};
           if (observed != nullptr)
-            std::memcpy(ev.observed, observed, atlantic_v5::REWRITE_PAYLOAD_LEN);
+            std::memcpy(ev.observed, observed, atlantic_v5::MAX_PAYLOAD);
           c->events->push_back(ev);
         },
         &ctx);
@@ -554,7 +633,7 @@ int main() {
     struct Sunk {
       std::vector<uint8_t> forwarded;
       bool had_observed = false;
-      uint8_t observed[atlantic_v5::REWRITE_PAYLOAD_LEN]{};
+      uint8_t observed[atlantic_v5::MAX_PAYLOAD]{};
     } sunk;
     relay.set_frame_sink(
         [](void *ctx, Channel, const Frame &f, const uint8_t *observed, uint32_t) {
@@ -562,7 +641,7 @@ int main() {
           s->forwarded.assign(f.raw(), f.raw() + f.raw_len());
           s->had_observed = observed != nullptr;
           if (observed != nullptr)
-            std::memcpy(s->observed, observed, atlantic_v5::REWRITE_PAYLOAD_LEN);
+            std::memcpy(s->observed, observed, atlantic_v5::MAX_PAYLOAD);
         },
         &sunk);
 

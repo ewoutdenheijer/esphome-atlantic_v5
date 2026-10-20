@@ -276,7 +276,7 @@ Headers with an established meaning.
 | `0x0164FEEB03` | M | 1 s | 12 | cycle | cycle 4 active / count — never observed running |
 | `0x0164FEEE03` | M | 1 s | 12 | cycle | cycle 5 active / count — never observed running |
 | `0x0164FEF103` | M | 1 s | 12 | cycle | cycle 6 active / count — possibly a start/stop transient |
-| **`0x0164FF1403`** | M | 1 s | 3 | 3 × bool | input I2, input I1, heating active — **the rewrite target** |
+| **`0x0164FF1403`** | M | 1 s | 3 | 3 × bool | input I2, input I1, heating active — rewritten by `control_mode` |
 | `0x0165000301` | H | init | 17 | text | HMI version |
 | `0x0165000A01` | H | init | 13 | text | HMI model — *assumed, see below* |
 | `0x0165FEF701` | H | 1 s | 1 | bool | heating element active — *assumed, see below* |
@@ -544,7 +544,7 @@ metered power never above ~500 W). The meter agreed with `0x0165FEF701` both
 times, so this is a statement about what `boost` does, not about what the frame
 means. What gates the element is unknown.
 
-Hard constraints:
+Hard constraints for the input-status rewrite:
 
 - Byte 2 must always be copied through from the original frame. It is a status
   report, not a command.
@@ -557,6 +557,11 @@ Hard constraints:
 - The effect depends on the unit being configured, via its own HMI menu, to use
   PV or smart-grid inputs. If it is not, the rewrite is accepted on the bus but
   does nothing.
+
+`0x0165FEF701` can also be overridden in MITM mode by the optional
+`heating_element` switch (README): the switch forces the observed one-byte
+values `00` or `64` on matching HMI-origin commands. The frame is otherwise
+forwarded unchanged, and the decoder continues to publish the received value.
 
 **No other writable parameter is known.** Do not attempt to synthesise `0x65`
 write frames for setpoint or mode; the unit's acceptance criteria are unknown and

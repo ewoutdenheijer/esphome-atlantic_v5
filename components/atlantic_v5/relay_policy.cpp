@@ -3,6 +3,17 @@
 namespace atlantic_v5 {
 
 bool RelayPolicy::apply(Frame &f) const {
+  if (f.header_key() == HEATING_ELEMENT_HEADER_KEY) {
+    if (f.channel() != Channel::HMI || f.payload_len() != HEATING_ELEMENT_PAYLOAD_LEN ||
+        f.buffered_payload_len() < HEATING_ELEMENT_PAYLOAD_LEN || !f.crc_valid())
+      return false;
+    uint8_t value = heating_element_value_.load(std::memory_order_relaxed);
+    if (value == 0xFF)
+      return false;
+    f.replace_payload(&value);
+    return true;
+  }
+
   if (f.header_key() != INPUT_STATUS_HEADER_KEY)
     return false;
   // Declared *and* present: payload()[2] is read below, and a frame closed

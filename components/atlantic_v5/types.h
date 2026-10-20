@@ -50,4 +50,10 @@ enum class ControlMode : uint8_t {
   BOOST = 4,
 };
 
+enum class CompressorMode : uint8_t {
+  AUTO = 0,
+  OFF = 1,
+  ON = 2,
+};
+
 }  // namespace atlantic_v5

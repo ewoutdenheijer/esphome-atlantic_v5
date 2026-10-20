@@ -174,6 +174,81 @@ int main() {
     CHECK(bad_crc.raw()[6] == 0x64);
   }
 
+  // --- Compressor control is Auto by default, and only overrides the
+  // candidate HMI command when Off or On is selected. ---
+  {
+    std::vector<uint8_t> command{0x01, 0x65, 0xFE, 0xF9, 0x01, 0x01, 0x64, 0, 0};
+    append_crc(command);
+
+    RelayPolicy policy;
+    Frame auto_mode(Channel::HMI, command.data(), static_cast<uint8_t>(command.size()));
+    CHECK(!policy.apply(auto_mode));
+    CHECK(auto_mode.raw()[6] == 0x64);
+
+    policy.set_compressor_mode(atlantic_v5::CompressorMode::OFF);
+    Frame forced_off(Channel::HMI, command.data(), static_cast<uint8_t>(command.size()));
+    CHECK(policy.apply(forced_off));
+    CHECK(forced_off.raw()[6] == 0x00);
+    CHECK(forced_off.crc_valid());
+
+    policy.set_compressor_mode(atlantic_v5::CompressorMode::ON);
+    command[6] = 0x00;
+    append_crc(command);
+    Frame forced_on(Channel::HMI, command.data(), static_cast<uint8_t>(command.size()));
+    CHECK(policy.apply(forced_on));
+    CHECK(forced_on.raw()[6] == 0x64);
+    CHECK(forced_on.crc_valid());
+
+    policy.set_compressor_mode(atlantic_v5::CompressorMode::AUTO);
+    Frame restored_auto(Channel::HMI, command.data(), static_cast<uint8_t>(command.size()));
+    CHECK(!policy.apply(restored_auto));
+    CHECK(restored_auto.raw()[6] == 0x00);
+
+    policy.set_compressor_mode(atlantic_v5::CompressorMode::ON);
+    Frame wrong_direction(Channel::MAIN, command.data(), static_cast<uint8_t>(command.size()));
+    CHECK(!policy.apply(wrong_direction));
+    CHECK(wrong_direction.raw()[6] == 0x00);
+
+    command.back() ^= 0x01;
+    Frame bad_crc(Channel::HMI, command.data(), static_cast<uint8_t>(command.size()));
+    CHECK(!policy.apply(bad_crc));
+    CHECK(bad_crc.raw()[6] == 0x00);
+  }
+
+  {
+    MockBusIo hmi_io, main_io;
+    RelayPolicy policy;
+    policy.set_compressor_mode(atlantic_v5::CompressorMode::OFF);
+    Relay relay(hmi_io, main_io, policy);
+    bool observed_command = false;
+    relay.set_frame_sink(
+        [](void *ctx, Channel channel, const Frame &f, const uint8_t *observed, uint32_t) {
+          auto *seen = static_cast<bool *>(ctx);
+          CHECK(channel == Channel::HMI);
+          CHECK(f.raw()[6] == 0x00);
+          CHECK(observed != nullptr && observed[0] == 0x64);
+          *seen = true;
+        },
+        &observed_command);
+
+    std::vector<uint8_t> command{0x01, 0x65, 0xFE, 0xF9, 0x01, 0x01, 0x64, 0, 0};
+    append_crc(command);
+    hmi_io.queue(1000, command);
+    hmi_io.set_now(1000);
+    main_io.set_now(1000);
+    relay.poll(1000);
+    hmi_io.set_now(5000);
+    main_io.set_now(5000);
+    relay.poll(5000);
+
+    CHECK(observed_command);
+    CHECK(main_io.writes_.size() == 1);
+    CHECK(main_io.writes_[0][6] == 0x00);
+    Frame forwarded(Channel::MAIN, main_io.writes_[0].data(),
+                    static_cast<uint8_t>(main_io.writes_[0].size()));
+    CHECK(forwarded.crc_valid());
+  }
+
   // A rewritten one-byte command still carries its original payload to the
   // decoder, while the far side receives the updated byte and CRC.
   {

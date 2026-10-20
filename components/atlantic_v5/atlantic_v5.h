@@ -70,6 +70,7 @@ class AtlanticV5Component : public Component {
 
   // Controllable entity write paths: the relay is the only reader of policy_.
   void set_control_mode(::atlantic_v5::ControlMode mode);
+  void set_compressor_mode(::atlantic_v5::CompressorMode mode) { this->policy_.set_compressor_mode(mode); }
   void set_heating_element_active(bool active) { this->policy_.set_heating_element_active(active); }
 
 #ifdef ATLANTIC_V5_LINK_BLACKOUT

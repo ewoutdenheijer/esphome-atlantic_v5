@@ -52,7 +52,7 @@ _Avoid_: timeout (that is the MAIN-quiet staleness gate)
 The window after a write to a Side during which bytes arriving back on that same Side are our own transceiver's echo, and are discarded rather than framed. MITM only, and not configurable: `flush_input()` after each write already removes the echo, so this is only a backstop for a byte that lands after that flush.
 
 **Controllable entity**:
-An entity whose ESPHome-side action writes into shared runtime state read by the relay task. The `select` control-mode entity and the `switch` heating-element entity write into RelayPolicy; the `switch` link-blackout entity writes into Relay.
+An entity whose ESPHome-side action writes into shared runtime state read by the relay task. The `select` control-mode and compressor-mode entities and the `switch` heating-element entity write into RelayPolicy; the `switch` link-blackout entity writes into Relay.
 _Avoid_: writable entity
 
 **Read-only entity**:
@@ -63,7 +63,7 @@ A Read-only entity derived solely from a header the message catalogue marks cade
 _Avoid_: identity entity, static entity, nameplate value
 
 **RelayPolicy** / **Rewrite**:
-The only code path allowed to alter bus bytes in flight; applies to the input-status frame (`0x0164FF1403`) and the optional heating-element command (`0x0165FEF701`), per the control surface described in [`docs/protocol.md`](docs/protocol.md).
+The only code path allowed to alter bus bytes in flight; applies to the input-status frame (`0x0164FF1403`), the optional heating-element command (`0x0165FEF701`), and the experimental compressor command candidate (`0x0165FEF901`), per the control surface described in [`docs/protocol.md`](docs/protocol.md).
 
 **Link blackout**:
 A deliberate, time-bounded suppression of frame forwarding in one or both directions, used to make the HMI believe it has lost MAIN so that it replays its initialisation burst on reconnection. Distinct from a Rewrite, which alters bytes: a blackout forwards nothing at all. An axis of its own, independent of control mode. MITM only — a passive tap forwards nothing to begin with.

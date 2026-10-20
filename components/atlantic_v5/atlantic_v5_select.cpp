@@ -17,6 +17,17 @@ void AtlanticV5Select::control(size_t index) {
   this->parent_->set_control_mode(static_cast<::atlantic_v5::ControlMode>(index));
 }
 
+void AtlanticV5CompressorSelect::setup() {
+  this->parent_->set_compressor_mode(::atlantic_v5::CompressorMode::AUTO);
+  this->publish_state(this->option_at(0));
+}
+
+// Compressor options follow CompressorMode enum order: AUTO, OFF, ON.
+void AtlanticV5CompressorSelect::control(size_t index) {
+  this->publish_state(index);
+  this->parent_->set_compressor_mode(static_cast<::atlantic_v5::CompressorMode>(index));
+}
+
 }  // namespace atlantic_v5_component
 }  // namespace esphome
 

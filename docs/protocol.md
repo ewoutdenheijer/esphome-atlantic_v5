@@ -368,8 +368,9 @@ reverse engineering, exactly the same status as this document's; only the
 ### Unmapped messages
 
 Headers that are known, expected, routine traffic, but whose meaning has not been
-established. These must not be reported as anomalies. None of them may be
-rewritten.
+established. These must not be reported as anomalies. None are rewritten except
+for the explicitly experimental `0x0165FEF901` compressor candidate described
+under *Control surface*.
 
 | Header key | Origin | Cadence | Len | Observed |
 |---|---|---|---|---|
@@ -494,7 +495,7 @@ are evidence; the labels are not.
 
 ## Control surface
 
-The only understood control path is the **input status frame `0x0164FF1403`**,
+The established control path is the **input status frame `0x0164FF1403`**,
 three bytes:
 
 ```
@@ -558,10 +559,23 @@ Hard constraints for the input-status rewrite:
   PV or smart-grid inputs. If it is not, the rewrite is accepted on the bus but
   does nothing.
 
-`0x0165FEF701` can also be overridden in MITM mode by the optional
+  The compressor candidate `0x0165FEF901` described above has an experimental
+  rewrite control, but its effect has not been established; do not treat it as an
+  understood control path.
+
+  `0x0165FEF701` can also be overridden in MITM mode by the optional
 `heating_element` switch (README): the switch forces the observed one-byte
 values `00` or `64` on matching HMI-origin commands. The frame is otherwise
 forwarded unchanged, and the decoder continues to publish the received value.
+
+**Experimental compressor candidate.** `0x0165FEF901` is an HMI-origin one-byte
+write whose `00`/`64` value tracks the compressor's apparent run span in the
+captures. That correlation does not prove the value controls it. The optional
+`compressor_mode` select (README) passes the frame through in `auto`, or
+rewrites matching CRC-valid HMI frames to `00` (`off`) or `64` (`on`). It never
+generates a frame. Until a controlled test with independent compressor power
+measurement confirms the effect, do not rely on `off` or `on` as a control or
+safety function.
 
 **No other writable parameter is known.** Do not attempt to synthesise `0x65`
 write frames for setpoint or mode; the unit's acceptance criteria are unknown and
@@ -605,6 +619,8 @@ A user with hardware can close these:
    `0x0165FEF901` tracks the compressor's apparent run span and `0x0165FF0101`
    brackets both transients. What `0x0165FEFB01` and `0x0165FF0301` add over
    those two, and why `0x0165FEFB01` alone spans the post-run, is still open.
+   `compressor_mode` is an experimental rewrite of `0x0165FEF901`; its effect
+   still needs controlled verification.
 7. Is the cycle `active` polarity inverted? Two sessions say yes — see *Cycle
    triplet semantics* — but the decoder has not been changed and the reading has
    only ever been checked against this one appliance.

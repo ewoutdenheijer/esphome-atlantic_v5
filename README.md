@@ -76,9 +76,9 @@ atlantic_v5:
 ```
 
 `tx_pin` is rejected in this mode and `tx_enable_pin` is unused — the component
-never drives the bus in `listener`. A `select: control_mode` entity is rejected
-at compile time too (see "Control (MITM only)" below); there's nothing to
-rewrite without a second UART sitting in the middle.
+never drives the bus in `listener`. The `control_mode` and `compressor_mode`
+selects are rejected at compile time too (see "Control (MITM only)" below);
+there's nothing to rewrite without a second UART sitting in the middle.
 
 ### `mitm` — relay + optional rewrite
 
@@ -362,6 +362,8 @@ select:
   - platform: atlantic_v5
     control_mode:
       name: Operation mode
+    compressor_mode:
+      name: Compressor mode
 ```
 
 `control_mode` rewrites the input-status frame (header `0164FF1403`), which
@@ -393,6 +395,33 @@ the HMI is told those two inputs are doing:
   effect — the unit simply ignores contacts it was never told to look at.
   There is no known way to query that configuration state from the bus, so
   this component cannot detect or warn about it.
+
+### Experimental compressor command override
+
+The `compressor_mode` select tests the candidate HMI command `0x0165FEF901`:
+`auto` passes it through unchanged, `off` rewrites its one-byte payload to
+`00`, and `on` rewrites it to `64`:
+
+| Option | Relay behavior |
+|---|---|
+| `auto` | Leave the HMI command unchanged |
+| `off` | Force matching commands to `00` |
+| `on` | Force matching commands to `64` |
+
+```yaml
+select:
+  - platform: atlantic_v5
+    compressor_mode:
+      name: Compressor mode
+```
+
+**Experimental: the compressor effect is not confirmed.** Captures show this
+HMI-origin value correlating with compressor operation, but do not establish
+that it is a command or that changing it will start or stop the compressor.
+This only rewrites matching CRC-valid, one-byte HMI frames in `mode: mitm`;
+it does not generate commands, and `auto` is the default at boot. Verify the
+result using independent power measurements and treat cycle/status entities as
+separate observations, not proof that this override succeeded.
 
 ### Heating-element command override
 
